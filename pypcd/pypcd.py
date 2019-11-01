@@ -12,7 +12,7 @@ dimatura@cmu.edu, 2013-2018
 import re
 import struct
 import copy
-import cStringIO as sio
+from io import StringIO as sio
 import numpy as np
 import warnings
 import lzf
@@ -81,7 +81,7 @@ def parse_header(lines):
     for ln in lines:
         if ln.startswith('#') or len(ln) < 2:
             continue
-        match = re.match('(\w+)\s+([\w\s\.]+)', ln)
+        match = re.match('(\w+)\s+([\w\s\.]+)', str(ln))
         if not match:
             warnings.warn("warning: can't understand line: %s" % ln)
             continue
@@ -91,7 +91,9 @@ def parse_header(lines):
         elif key in ('fields', 'type'):
             metadata[key] = value.split()
         elif key in ('size', 'count'):
-            metadata[key] = map(int, value.split())
+            #print('found size and count k %s  v %s '% (key, value))
+            metadata[key] = list(map(int, value.split()))
+            #print(list(map(int,value.split())))
         elif key in ('width', 'height', 'points'):
             metadata[key] = int(value)
         elif key == 'viewpoint':
@@ -158,7 +160,7 @@ def _metadata_is_consistent(metadata):
             print('%s required' % f)
     checks.append((lambda m: all([k in m for k in required]),
                    'missing field'))
-    checks.append((lambda m: len(m['type']) == len(m['count']) ==
+    checks.append((lambda m: len(m['type']) == len(list(m['count'])) ==
                    len(m['fields']),
                    'length of type, count and fields must be equal'))
     checks.append((lambda m: m['height'] > 0,
@@ -207,7 +209,8 @@ def _build_dtype(metadata):
         else:
             fieldnames.extend(['%s_%04d' % (f, i) for i in xrange(c)])
             typenames.extend([np_type]*c)
-    dtype = np.dtype(zip(fieldnames, typenames))
+    print(set(zip(fieldnames, typenames)))
+    dtype = np.dtype(list(zip(fieldnames, typenames)))
     return dtype
 
 
@@ -277,9 +280,10 @@ def point_cloud_from_fileobj(f):
     """
     header = []
     while True:
-        ln = f.readline().strip()
+        ln = f.readline().strip().decode('ascii')
         header.append(ln)
         if ln.startswith('DATA'):
+            print('starts with Data %s' % ln)
             metadata = parse_header(header)
             dtype = _build_dtype(metadata)
             break
